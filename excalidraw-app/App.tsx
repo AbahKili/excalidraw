@@ -30,12 +30,13 @@ import {
   isTestEnv,
   preventUnload,
   resolvablePromise,
-  isRunningInIframe,
   isDevEnv,
 } from "@excalidraw/common";
 import polyfill from "@excalidraw/excalidraw/polyfill";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FC } from "react";
+import { Dashboard } from "./components/Dashboard";
+import { getSession, updateSession, setActiveSessionId, getActiveSessionId, clearActiveSession } from "./data/sessionStore";
 import { loadFromBlob } from "@excalidraw/excalidraw/data/blob";
 import { t } from "@excalidraw/excalidraw/i18n";
 
@@ -360,11 +361,18 @@ const initializeScene = async (opts: {
   return { scene: null, isExternalScene: false };
 };
 
-const ExcalidrawWrapper = () => {
+const ExcalidrawWrapper = ({
+  onBackToDashboard,
+  preloadedScene,
+}: {
+  onBackToDashboard?: () => void;
+  preloadedScene?: { elements: readonly any[]; appState: any } | null;
+}) => {
   const excalidrawAPI = useExcalidrawAPI();
 
   const [errorMessage, setErrorMessage] = useState("");
-  const isCollabDisabled = isRunningInIframe();
+  // Standalone deployment — no collab backend available
+  const isCollabDisabled = true;
 
   const { editorTheme, appTheme, setAppTheme } = useHandleAppTheme();
 
@@ -379,8 +387,16 @@ const ExcalidrawWrapper = () => {
     promise: ResolvablePromise<ExcalidrawInitialDataState | null>;
   }>({ promise: null! });
   if (!initialStatePromiseRef.current.promise) {
-    initialStatePromiseRef.current.promise =
-      resolvablePromise<ExcalidrawInitialDataState | null>();
+    const promise = resolvablePromise<ExcalidrawInitialDataState | null>();
+    // If we have preloaded scene data, resolve immediately to skip the loading spinner
+    if (preloadedScene) {
+      promise.resolve({
+        elements: restoreElements(preloadedScene.elements, null, { repairBindings: true }),
+        appState: restoreAppState(preloadedScene.appState, null),
+        scrollToContent: true,
+      });
+    }
+    initialStatePromiseRef.current.promise = promise;
   }
 
   const debugCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -851,6 +867,27 @@ const ExcalidrawWrapper = () => {
     );
   }
 
+  // Save to session store periodically when a session is active
+  useEffect(() => {
+    if (!onBackToDashboard) return;
+    const doSave = () => {
+      try {
+        const elements = localStorage.getItem(STORAGE_KEYS.LOCAL_STORAGE_ELEMENTS);
+        const appState = localStorage.getItem(STORAGE_KEYS.LOCAL_STORAGE_APP_STATE);
+        const sid = getActiveSessionId();
+        if (sid) {
+          updateSession(sid, { sceneData: JSON.stringify({ elements, appState }) });
+        }
+      } catch { /* ignore */ }
+    };
+    const interval = setInterval(doSave, 5000);
+    window.addEventListener("beforeunload", doSave);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("beforeunload", doSave);
+    };
+  }, [onBackToDashboard]);
+
   return (
     <div
       style={{ height: "100%" }}
@@ -883,6 +920,28 @@ const ExcalidrawWrapper = () => {
 
           return (
             <div className="excalidraw-ui-top-right" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {onBackToDashboard && (
+                <button
+                  onClick={onBackToDashboard}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "5px 12px",
+                    border: "1px solid var(--color-border)",
+                    borderRadius: 6,
+                    background: "var(--color-surface-low)",
+                    color: "var(--color-text)",
+                    cursor: "pointer",
+                    fontSize: 13,
+                    fontWeight: 500,
+                  }}
+                  title="Back to Dashboard"
+                >
+                  <span style={{ fontSize: 16, lineHeight: 1 }}>&larr;</span>
+                  Dashboard
+                </button>
+              )}
               <GoogleSignInButton />
               {collabAPI && !isCollabDisabled && (
                 <>
@@ -1072,10 +1131,26 @@ const ExcalidrawWrapper = () => {
   );
 };
 
+function getViewFromHash(): { view: "dashboard" } | { view: "canvas"; sessionId: string } {
+  const match = window.location.hash.match(/^#\/canvas\/(.+)$/);
+  if (match) return { view: "canvas", sessionId: match[1] };
+  return { view: "dashboard" };
+}
+
 const ExcalidrawApp = () => {
   const [authenticated, setAuthenticated] = useState(false);
   const [checking, setChecking] = useState(true);
   const [LoginComponent, setLoginComponent] = useState<FC<{ onAuthenticated: () => void }> | null>(null);
+  const [hashState, setHashState] = useState(getViewFromHash);
+  const activeSessionRef = useRef(hashState.view === "canvas" ? hashState.sessionId : null);
+  activeSessionRef.current = hashState.view === "canvas" ? hashState.sessionId : null;
+
+  // Listen for browser back/forward on hash
+  useEffect(() => {
+    const onHashChange = () => setHashState(getViewFromHash());
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, []);
 
   useEffect(() => {
     import("./components/NerdStudioLogin").then((m) => {
@@ -1083,9 +1158,7 @@ const ExcalidrawApp = () => {
       const token = m.getStoredToken();
       if (token) {
         m.verifyToken(token).then((user) => {
-          if (user) {
-            setAuthenticated(true);
-          }
+          if (user) setAuthenticated(true);
           setChecking(false);
         });
       } else {
@@ -1094,7 +1167,53 @@ const ExcalidrawApp = () => {
     });
   }, []);
 
-  if (checking || !LoginComponent) {
+  const navigateToCanvas = useCallback((sessionId: string, isNew: boolean) => {
+    if (isNew) {
+      localStorage.removeItem(STORAGE_KEYS.LOCAL_STORAGE_ELEMENTS);
+      localStorage.removeItem(STORAGE_KEYS.LOCAL_STORAGE_APP_STATE);
+    } else {
+      const session = getSession(sessionId);
+      if (session?.sceneData) {
+        try {
+          const scene = JSON.parse(session.sceneData);
+          if (scene.elements) {
+            localStorage.setItem(STORAGE_KEYS.LOCAL_STORAGE_ELEMENTS, JSON.stringify(scene.elements));
+          } else {
+            localStorage.removeItem(STORAGE_KEYS.LOCAL_STORAGE_ELEMENTS);
+          }
+          if (scene.appState) {
+            localStorage.setItem(STORAGE_KEYS.LOCAL_STORAGE_APP_STATE, JSON.stringify(scene.appState));
+          } else {
+            localStorage.removeItem(STORAGE_KEYS.LOCAL_STORAGE_APP_STATE);
+          }
+        } catch {
+          localStorage.removeItem(STORAGE_KEYS.LOCAL_STORAGE_ELEMENTS);
+          localStorage.removeItem(STORAGE_KEYS.LOCAL_STORAGE_APP_STATE);
+        }
+      } else {
+        localStorage.removeItem(STORAGE_KEYS.LOCAL_STORAGE_ELEMENTS);
+        localStorage.removeItem(STORAGE_KEYS.LOCAL_STORAGE_APP_STATE);
+      }
+    }
+    setActiveSessionId(sessionId);
+    window.location.hash = `#/canvas/${sessionId}`;
+  }, []);
+
+  const navigateToDashboard = useCallback(() => {
+    // Flush save current scene before leaving
+    const sid = activeSessionRef.current;
+    if (sid) {
+      try {
+        const elements = localStorage.getItem(STORAGE_KEYS.LOCAL_STORAGE_ELEMENTS);
+        const appState = localStorage.getItem(STORAGE_KEYS.LOCAL_STORAGE_APP_STATE);
+        updateSession(sid, { sceneData: JSON.stringify({ elements, appState }) });
+      } catch { /* ignore */ }
+    }
+    clearActiveSession();
+    window.location.hash = "";
+  }, []);
+
+  if (!LoginComponent) {
     return null;
   }
 
@@ -1102,11 +1221,44 @@ const ExcalidrawApp = () => {
     return <LoginComponent onAuthenticated={() => setAuthenticated(true)} />;
   }
 
+  if (checking) {
+    return null;
+  }
+
+  const preloadedScene = useMemo(() => {
+    if (hashState.view !== "canvas") return null;
+    const session = getSession(hashState.sessionId);
+    if (!session?.sceneData) return null;
+    try {
+      const raw = JSON.parse(session.sceneData);
+      const elements = raw.elements ? JSON.parse(raw.elements) : [];
+      const appState = raw.appState ? JSON.parse(raw.appState) : {};
+      if (elements.length || Object.keys(appState).length) {
+        return { elements, appState };
+      }
+    } catch { /* ignore */ }
+    return null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hashState.view === "canvas" ? hashState.sessionId : null]);
+
+  if (hashState.view === "dashboard") {
+    return (
+      <Dashboard
+        onNewCanvas={(id) => navigateToCanvas(id, true)}
+        onOpenCanvas={(id) => navigateToCanvas(id, false)}
+      />
+    );
+  }
+
   return (
     <TopErrorBoundary>
       <Provider store={appJotaiStore}>
         <ExcalidrawAPIProvider>
-          <ExcalidrawWrapper />
+          <ExcalidrawWrapper
+            key={hashState.sessionId}
+            onBackToDashboard={navigateToDashboard}
+            preloadedScene={preloadedScene}
+          />
         </ExcalidrawAPIProvider>
       </Provider>
     </TopErrorBoundary>

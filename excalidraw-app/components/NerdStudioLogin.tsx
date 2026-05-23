@@ -7,7 +7,7 @@ const REDIRECT_URI = "https://draw.nerdstudio.online/auth/callback";
 const STORAGE_KEY = "nerdstudio_token";
 const USER_KEY = "nerdstudio_user";
 
-interface NerdStudioUser {
+export interface NerdStudioUser {
   id: string;
   email: string;
   name: string;
