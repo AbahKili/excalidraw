@@ -402,7 +402,7 @@
   },
   "roomDialog": {
     "desc_intro": "Invite people to collaborate on your drawing.",
-    "desc_privacy": "Don't worry, the session is end-to-end encrypted, and fully private. Not even our server can see what you draw.",
+    "desc_privacy": "Your drawings are stored locally in your browser session and are fully private.",
     "button_startSession": "Start session",
     "button_stopSession": "Stop session",
     "desc_inProgressIntro": "Live-collaboration session is now in progress.",
@@ -525,8 +525,8 @@
     }
   },
   "encrypted": {
-    "tooltip": "Your drawings are end-to-end encrypted so Excalidraw's servers will never see them.",
-    "link": "Blog post on end-to-end encryption in Excalidraw"
+    "tooltip": "Your drawings are stored locally in your browser session securely.",
+    "link": "Your drawings are stored locally in your browser"
   },
   "stats": {
     "angle": "Angle",
