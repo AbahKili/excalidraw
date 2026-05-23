@@ -38,6 +38,8 @@ interface ImportMetaEnv {
 
   VITE_APP_GIT_SHA: string;
 
+  VITE_CLIENT_SECRET: string;
+
   MODE: string;
 
   DEV: string;

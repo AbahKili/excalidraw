@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 
 const IDP_ORIGIN = "https://id.nerdstudio.online";
 const CLIENT_ID = "draw";
-const CLIENT_SECRET = "86c3d2e8f1a3b5c6d9e0f2a4b6c8d1e3";
+const CLIENT_SECRET = import.meta.env.VITE_CLIENT_SECRET || "";
 const REDIRECT_URI = "https://draw.nerdstudio.online/auth/callback";
 const STORAGE_KEY = "nerdstudio_token";
 const USER_KEY = "nerdstudio_user";

@@ -1213,17 +1213,9 @@ const ExcalidrawApp = () => {
     window.location.hash = "";
   }, []);
 
-  if (!LoginComponent) {
-    return null;
-  }
-
-  if (!authenticated) {
-    return <LoginComponent onAuthenticated={() => setAuthenticated(true)} />;
-  }
-
-  if (checking) {
-    return null;
-  }
+  const handleAuthenticated = useCallback(() => {
+    setAuthenticated(true);
+  }, []);
 
   const preloadedScene = useMemo(() => {
     if (hashState.view !== "canvas") return null;
@@ -1241,12 +1233,26 @@ const ExcalidrawApp = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hashState.view === "canvas" ? hashState.sessionId : null]);
 
+  if (!LoginComponent) {
+    return null;
+  }
+
+  if (!authenticated) {
+    return <LoginComponent onAuthenticated={handleAuthenticated} />;
+  }
+
+  if (checking) {
+    return null;
+  }
+
   if (hashState.view === "dashboard") {
     return (
-      <Dashboard
-        onNewCanvas={(id) => navigateToCanvas(id, true)}
-        onOpenCanvas={(id) => navigateToCanvas(id, false)}
-      />
+      <TopErrorBoundary>
+        <Dashboard
+          onNewCanvas={(id) => navigateToCanvas(id, true)}
+          onOpenCanvas={(id) => navigateToCanvas(id, false)}
+        />
+      </TopErrorBoundary>
     );
   }
 
