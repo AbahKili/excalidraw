@@ -40,9 +40,6 @@ import DropdownMenuItemContentRadio from "../dropdownMenu/DropdownMenuItemConten
 import DropdownMenuItemLink from "../dropdownMenu/DropdownMenuItemLink";
 import DropdownMenuSub from "../dropdownMenu/DropdownMenuSub";
 import {
-  GithubIcon,
-  DiscordIcon,
-  XBrandIcon,
   settingsIcon,
   emptyIcon,
 } from "../icons";
@@ -358,37 +355,6 @@ export const Export = () => {
   );
 };
 Export.displayName = "Export";
-
-export const Socials = () => {
-  const { t } = useI18n();
-
-  return (
-    <>
-      <DropdownMenuItemLink
-        icon={GithubIcon}
-        href="https://github.com/excalidraw/excalidraw"
-        aria-label="GitHub"
-      >
-        GitHub
-      </DropdownMenuItemLink>
-      <DropdownMenuItemLink
-        icon={XBrandIcon}
-        href="https://x.com/excalidraw"
-        aria-label="X"
-      >
-        {t("labels.followUs")}
-      </DropdownMenuItemLink>
-      <DropdownMenuItemLink
-        icon={DiscordIcon}
-        href="https://discord.gg/UexuTaE"
-        aria-label="Discord"
-      >
-        {t("labels.discordChat")}
-      </DropdownMenuItemLink>
-    </>
-  );
-};
-Socials.displayName = "Socials";
 
 export const LiveCollaborationTrigger = ({
   onSelect,
