@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from "react";
 
 const IDP_ORIGIN = "https://id.nerdstudio.online";
-const CLIENT_ID = "draw";
-const CLIENT_SECRET = import.meta.env.VITE_CLIENT_SECRET || "";
 const REDIRECT_URI = "https://draw.nerdstudio.online/auth/callback";
 const STORAGE_KEY = "nerdstudio_token";
 const USER_KEY = "nerdstudio_user";
@@ -49,17 +47,12 @@ async function exchangeCode(code: string): Promise<{
   user: NerdStudioUser;
 } | null> {
   try {
-    const resp = await fetch(`${IDP_ORIGIN}/api/token/exchange`, {
+    // Proxy through server — client_secret never touches the browser
+    const resp = await fetch("/api/auth/exchange", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        code,
-        client_id: CLIENT_ID,
-        client_secret: CLIENT_SECRET,
-        redirect_uri: REDIRECT_URI,
-      }),
+      body: JSON.stringify({ code, redirect_uri: REDIRECT_URI }),
     });
-
     if (!resp.ok) return null;
     const data = await resp.json();
     return { token: data.token, user: data.user };
@@ -88,7 +81,7 @@ export async function verifyToken(
 function handleSignIn() {
   const state = generateState();
   sessionStorage.setItem("nerdstudio_oauth_state", state);
-  const url = `${IDP_ORIGIN}/api/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&state=${state}`;
+  const url = `${IDP_ORIGIN}/api/authorize?client_id=draw&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&state=${state}`;
   window.location.href = url;
 }
 
