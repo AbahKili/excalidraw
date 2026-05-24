@@ -36,7 +36,7 @@ import polyfill from "@excalidraw/excalidraw/polyfill";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FC } from "react";
 import { Dashboard } from "./components/Dashboard";
-import { getSession, updateSession, setActiveSessionId, getActiveSessionId, clearActiveSession } from "./data/sessionStore";
+import { getSession, updateSession, renameSession, setActiveSessionId, getActiveSessionId, clearActiveSession } from "./data/sessionStore";
 import { loadFromBlob } from "@excalidraw/excalidraw/data/blob";
 import { t } from "@excalidraw/excalidraw/i18n";
 
@@ -364,15 +364,38 @@ const initializeScene = async (opts: {
 const ExcalidrawWrapper = ({
   onBackToDashboard,
   preloadedScene,
+  sessionTitle,
+  onRenameSession,
 }: {
   onBackToDashboard?: () => void;
   preloadedScene?: { elements: readonly any[]; appState: any } | null;
+  sessionTitle?: string;
+  onRenameSession?: (title: string) => void;
 }) => {
   const excalidrawAPI = useExcalidrawAPI();
 
   const [errorMessage, setErrorMessage] = useState("");
   // Standalone deployment — no collab backend available
   const isCollabDisabled = true;
+
+  // Inline title editing state
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [draftTitle, setDraftTitle] = useState("");
+  const titleInputRef = useRef<HTMLInputElement>(null);
+
+  const startEditing = () => {
+    setDraftTitle(sessionTitle || "");
+    setEditingTitle(true);
+    setTimeout(() => titleInputRef.current?.select(), 0);
+  };
+
+  const submitRename = () => {
+    const trimmed = draftTitle.trim();
+    if (trimmed && trimmed !== sessionTitle) {
+      onRenameSession?.(trimmed);
+    }
+    setEditingTitle(false);
+  };
 
   const { editorTheme, appTheme, setAppTheme } = useHandleAppTheme();
 
@@ -942,6 +965,58 @@ const ExcalidrawWrapper = ({
                   Dashboard
                 </button>
               )}
+              {sessionTitle !== undefined && (
+                editingTitle ? (
+                  <input
+                    ref={titleInputRef}
+                    value={draftTitle}
+                    onChange={(e) => setDraftTitle(e.target.value)}
+                    onBlur={submitRename}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") submitRename();
+                      if (e.key === "Escape") setEditingTitle(false);
+                    }}
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 500,
+                      padding: "5px 8px",
+                      border: "1px solid var(--color-primary)",
+                      borderRadius: 4,
+                      background: "var(--color-surface-high)",
+                      color: "var(--color-text)",
+                      outline: "none",
+                      minWidth: 120,
+                    }}
+                  />
+                ) : (
+                  <span
+                    onClick={startEditing}
+                    title="Click to rename"
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 500,
+                      padding: "5px 8px",
+                      cursor: "pointer",
+                      borderRadius: 4,
+                      border: "1px solid transparent",
+                      transition: "border-color 0.15s",
+                      maxWidth: 200,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                      color: "var(--color-text)",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = "var(--color-border)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = "transparent";
+                    }}
+                  >
+                    {sessionTitle}
+                  </span>
+                )
+              )}
               <GoogleSignInButton />
               {collabAPI && !isCollabDisabled && (
                 <>
@@ -1233,6 +1308,21 @@ const ExcalidrawApp = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hashState.view === "canvas" ? hashState.sessionId : null]);
 
+  const [titleVersion, setTitleVersion] = useState(0);
+
+  const sessionTitle = useMemo(() => {
+    if (hashState.view !== "canvas") return undefined;
+    void titleVersion; // included to bust memo cache on rename
+    return getSession(hashState.sessionId)?.title;
+  }, [hashState.view === "canvas" ? hashState.sessionId : null, titleVersion]);
+
+  const handleRenameSession = useCallback((title: string) => {
+    if (hashState.view === "canvas") {
+      renameSession(hashState.sessionId, title);
+      setTitleVersion(v => v + 1);
+    }
+  }, [hashState]);
+
   if (!LoginComponent) {
     return null;
   }
@@ -1264,6 +1354,8 @@ const ExcalidrawApp = () => {
             key={hashState.sessionId}
             onBackToDashboard={navigateToDashboard}
             preloadedScene={preloadedScene}
+            sessionTitle={sessionTitle}
+            onRenameSession={handleRenameSession}
           />
         </ExcalidrawAPIProvider>
       </Provider>
