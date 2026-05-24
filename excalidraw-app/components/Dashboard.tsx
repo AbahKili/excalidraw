@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { getStoredUser, clearAuth, type NerdStudioUser } from "./NerdStudioLogin";
-import { listSessions, createSession, deleteSession, renameSession, type SessionMeta } from "../data/sessionStore";
+import { listSessions, createSession, deleteSession, renameSession, syncFromServer, type SessionMeta } from "../data/sessionStore";
 
 interface DashboardProps {
   onNewCanvas: (sessionId: string) => void;
@@ -17,6 +17,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNewCanvas, onOpenCanvas 
   useEffect(() => {
     setUser(getStoredUser());
     setSessions(listSessions());
+    // Pull latest from server in background
+    syncFromServer().then(() => setSessions(listSessions()));
   }, []);
 
   const refresh = useCallback(() => {

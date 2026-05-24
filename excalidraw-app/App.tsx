@@ -36,7 +36,7 @@ import polyfill from "@excalidraw/excalidraw/polyfill";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FC } from "react";
 import { Dashboard } from "./components/Dashboard";
-import { getSession, updateSession, renameSession, setActiveSessionId, getActiveSessionId, clearActiveSession } from "./data/sessionStore";
+import { getSession, updateSession, renameSession, setActiveSessionId, getActiveSessionId, clearActiveSession, syncFromServer } from "./data/sessionStore";
 import { loadFromBlob } from "@excalidraw/excalidraw/data/blob";
 import { t } from "@excalidraw/excalidraw/i18n";
 
@@ -1281,7 +1281,7 @@ const ExcalidrawApp = () => {
       const token = m.getStoredToken();
       if (token) {
         m.verifyToken(token).then((user) => {
-          if (user) setAuthenticated(true);
+          if (user) { setAuthenticated(true); syncFromServer(); }
           setChecking(false);
         });
       } else {
@@ -1338,6 +1338,7 @@ const ExcalidrawApp = () => {
 
   const handleAuthenticated = useCallback(() => {
     setAuthenticated(true);
+    syncFromServer();
   }, []);
 
   const preloadedScene = useMemo(() => {
