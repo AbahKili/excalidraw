@@ -114,6 +114,34 @@ export function getSession(id: string): Session | null {
   return getAll().find((s) => s.id === id) || null;
 }
 
+// Fetch full session (with scene_data) from server for cross-device sync
+export async function fetchSessionFromServer(id: string): Promise<Session | null> {
+  const resp = await api("GET", `/sessions/${id}`);
+  if (!resp || !resp.ok) return null;
+  try {
+    const data: { id: string; title: string; sceneData: string | null; lastModified: string } =
+      await resp.json();
+    // Update localStorage with server data
+    const sessions = getAll();
+    const idx = sessions.findIndex((s) => s.id === id);
+    const session: Session = {
+      id: data.id,
+      title: data.title,
+      lastModified: data.lastModified,
+      sceneData: data.sceneData,
+    };
+    if (idx >= 0) {
+      sessions[idx] = session;
+    } else {
+      sessions.unshift(session);
+    }
+    saveAll(sessions);
+    return session;
+  } catch {
+    return null;
+  }
+}
+
 export function updateSession(
   id: string,
   updates: Partial<Pick<Session, "title" | "sceneData">>,

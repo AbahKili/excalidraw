@@ -36,7 +36,7 @@ import polyfill from "@excalidraw/excalidraw/polyfill";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FC } from "react";
 import { Dashboard } from "./components/Dashboard";
-import { getSession, updateSession, renameSession, setActiveSessionId, getActiveSessionId, clearActiveSession, syncFromServer } from "./data/sessionStore";
+import { getSession, updateSession, renameSession, setActiveSessionId, getActiveSessionId, clearActiveSession, syncFromServer, fetchSessionFromServer } from "./data/sessionStore";
 import { loadFromBlob } from "@excalidraw/excalidraw/data/blob";
 import { t } from "@excalidraw/excalidraw/i18n";
 
@@ -1290,12 +1290,16 @@ const ExcalidrawApp = () => {
     });
   }, []);
 
-  const navigateToCanvas = useCallback((sessionId: string, isNew: boolean) => {
+  const navigateToCanvas = useCallback(async (sessionId: string, isNew: boolean) => {
     if (isNew) {
       localStorage.removeItem(STORAGE_KEYS.LOCAL_STORAGE_ELEMENTS);
       localStorage.removeItem(STORAGE_KEYS.LOCAL_STORAGE_APP_STATE);
     } else {
-      const session = getSession(sessionId);
+      let session = getSession(sessionId);
+      // If no local scene data, fetch from server (cross-device sync)
+      if (!session?.sceneData && localStorage.getItem("nerdstudio_token")) {
+        session = await fetchSessionFromServer(sessionId);
+      }
       if (session?.sceneData) {
         try {
           const scene = JSON.parse(session.sceneData);
