@@ -939,33 +939,81 @@ const ExcalidrawWrapper = ({
         autoFocus={true}
         theme={editorTheme}
         renderTopRightUI={(isMobile) => {
-          if (isMobile) return null;
-
           return (
-            <div className="excalidraw-ui-top-right" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div className="excalidraw-ui-top-right" style={{
+              display: "flex",
+              alignItems: "center",
+              gap: isMobile ? 4 : 8,
+            }}>
               {onBackToDashboard && (
                 <button
                   onClick={onBackToDashboard}
                   style={{
                     display: "flex",
                     alignItems: "center",
-                    gap: 6,
-                    padding: "5px 12px",
+                    gap: isMobile ? 4 : 6,
+                    padding: isMobile ? "4px 8px" : "5px 12px",
                     border: "1px solid var(--color-border)",
                     borderRadius: 6,
                     background: "var(--color-surface-low)",
                     color: "var(--color-text)",
                     cursor: "pointer",
-                    fontSize: 13,
+                    fontSize: isMobile ? 12 : 13,
                     fontWeight: 500,
                   }}
                   title="Back to Dashboard"
                 >
-                  <span style={{ fontSize: 16, lineHeight: 1 }}>&larr;</span>
-                  Dashboard
+                  <span style={{ fontSize: isMobile ? 14 : 16, lineHeight: 1 }}>&larr;</span>
+                  {isMobile ? null : "Dashboard"}
                 </button>
               )}
-              {sessionTitle !== undefined && (
+              {sessionTitle !== undefined && (isMobile ? (
+                <button
+                  onClick={startEditing}
+                  title="Tap to rename"
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 500,
+                    padding: "4px 8px",
+                    cursor: "pointer",
+                    borderRadius: 4,
+                    border: "1px solid var(--color-border)",
+                    background: "var(--color-surface-low)",
+                    color: "var(--color-text)",
+                    maxWidth: 140,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                    outline: "none",
+                  }}
+                >
+                  {editingTitle ? (
+                    <input
+                      ref={titleInputRef}
+                      value={draftTitle}
+                      onChange={(e) => setDraftTitle(e.target.value)}
+                      onBlur={submitRename}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") submitRename();
+                        if (e.key === "Escape") setEditingTitle(false);
+                      }}
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 500,
+                        background: "transparent",
+                        border: "none",
+                        color: "var(--color-text)",
+                        outline: "none",
+                        width: 120,
+                        textAlign: "center",
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  ) : (
+                    sessionTitle
+                  )}
+                </button>
+              ) : (
                 editingTitle ? (
                   <input
                     ref={titleInputRef}
@@ -1016,9 +1064,9 @@ const ExcalidrawWrapper = ({
                     {sessionTitle}
                   </span>
                 )
-              )}
-              <GoogleSignInButton />
-              {collabAPI && !isCollabDisabled && (
+              ))}
+              {!isMobile && <GoogleSignInButton />}
+              {!isMobile && collabAPI && !isCollabDisabled && (
                 <>
                   {collabError.message && <CollabError collabError={collabError} />}
                   <LiveCollaborationTrigger
